@@ -1,5 +1,6 @@
 import time         # unconditional wait (testing)
 import csv
+import math
 
 from selenium import webdriver
 import undetected_chromedriver as uc
@@ -22,9 +23,26 @@ options.add_argument("--no-first-run --no-service-autorun --password-store=basic
 
 driver = uc.Chrome(options=options)
 
-for i in range(501,552):
-    all_data = []
-    
+for i in range(2000):       #number of total pages, split equally across property types
+    page_data = []
+    property_types_links = {
+        "Căn hộ chung cư": "https://batdongsan.com.vn/ban-can-ho-chung-cu",
+        "Căn hộ chung cư mini": "https://batdongsan.com.vn/ban-can-ho-chung-cu-mini",
+        "Nhà riêng": "https://batdongsan.com.vn/ban-nha-rieng",
+        "Nhà biệt thự, liền kề": "https://batdongsan.com.vn/ban-nha-biet-thu-lien-ke",
+        "Nhà mặt phố": "https://batdongsan.com.vn/ban-nha-mat-pho",
+        "Shophouse, nhà phố thương mại": "https://batdongsan.com.vn/ban-shophouse-nha-pho-thuong-mai",
+        "Đất nền dự án": "https://batdongsan.com.vn/ban-dat-nen-du-an",
+        "Đất": "https://batdongsan.com.vn/ban-dat",
+        "Condotel": "https://batdongsan.com.vn/ban-condotel",
+        "Trang trại, khu nghỉ dưỡng": "https://batdongsan.com.vn/ban-trang-trai-khu-nghi-duong",
+        "Kho, nhà xưởng": "https://batdongsan.com.vn/ban-kho-nha-xuong",
+        "Khác": "https://batdongsan.com.vn/ban-loai-bat-dong-san-khac"
+    }
+
+    current_type = list(property_types_links.keys())[i % len(property_types_links)]
+    current_link = property_types_links[current_type]
+    current_page_num = i // len(property_types_links) + 1
     for j in range(20):
         new_line = {
             "price": None,
@@ -41,16 +59,28 @@ for i in range(501,552):
             "latitude": None,
             "longitude": None,
             "verified": None,
-            "location": None,
+            "location": None,       # address (ward, city/district)
+            "location_details":None,
+            "property_type":current_type,
+            "date_of_posting": None,
         }
-        driver.get(f"https://batdongsan.com.vn/nha-dat-ban/p{i+1}?sortValue=8")
+        driver.get(current_link + f"/p{current_page_num}?sortValue=8")
         print("Tried going back")
 
         WebDriverWait(driver, 60).until(
-            ec.presence_of_element_located((By.CLASS_NAME, "re__card-info"))
+            ec.presence_of_element_located((By.CLASS_NAME, "re__srp-total-count.js__srp-total-result"))
         )
-        print(f"item {j} in page {i+1}")
-        page_result = driver.find_elements(By.CLASS_NAME, "re__card-info")[j]       # refetch results after driver.back()
+        num_results = int(extract_numeric(driver.find_element(By.CSS_SELECTOR, ".re__srp-total-count.js__srp-total-result > #count-number").text))
+        if math.ceil(num_results / 20) < current_page_num:
+            print("no more results")
+            break
+        print(f"(i={i}) item {j} in page {current_page_num} of property type {current_type}")
+
+        try:
+            page_result = driver.find_elements(By.CLASS_NAME, "re__card-info")[j]       # refetch results after driver.back()
+        except Exception as e:              # in case the last page doesn't have full 20 results
+            print(e)
+            break
 
         try:
             new_line["location"] = page_result.find_elements(By.CSS_SELECTOR, ".re__card-location > *")[1].text.strip()
@@ -117,7 +147,7 @@ for i in range(501,552):
             "re__section-body.re__detail-content.js__section-body.js__pr-description.js__tracking"
         ).text
 
-        all_data.append(new_line)
+        page_data.append(new_line)
         print({k:v for k,v in new_line.items() if k != "description"})
 
     # write result after scraping a full page
@@ -126,7 +156,7 @@ for i in range(501,552):
         writer = csv.DictWriter(f, new_line.keys())
         if mode == "w":
             writer.writeheader()
-        writer.writerows(all_data)
+        writer.writerows(page_data)
 
     print(f"page {i+1} scraped successfully")
 
