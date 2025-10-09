@@ -8,7 +8,7 @@ ORDER BY "Mean price per meter squared" DESC;
 -- 8. What is the average price for properties in District 1
 SELECT AVG(price) "Average price at District 1" 
 FROM houses 
-WHERE "city/province" = 'TPHCM' AND district = 'Quận 1'
+WHERE city_province = 'Hồ Chí Minh' AND district = 'Quận 1'
 
 -- 9. List all properties ordered by price from highest to lowest
 SELECT * FROM houses ORDER BY price DESC;
